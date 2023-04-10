@@ -9,29 +9,29 @@ class Manager:
         self.bids_dir = Path(bids_dir)
         self.layout = pybids.BIDSLayout(str(self.bids_dir))
 
-    def validate(self):
-        # Validate the BIDS directory
+    def validate(self) -> bool:
+        """
+        Validate the BIDS directory
+
+        Returns
+        -------
+        bool
+            True if the BIDS directory is valid, False otherwise
+        """
         return self.layout.validate()
 
-    def search(self, suffix):
-        # Use glob to search for files with a specific suffix in the BIDS directory
+    def search(self, suffix: str) -> list:
+        """
+        Search for files with a specific suffix in the BIDS directory
+
+        Parameters
+        ----------
+        suffix : str
+            The suffix to search for
+
+        Returns
+        -------
+        list
+            A list of paths to files with the specified suffix
+        """
         return list(self.bids_dir.glob(f'**/*{suffix}'))
-
-    def read_json(self, filename):
-        # Read a JSON file from the BIDS directory
-        with open(self.bids_dir / filename, 'r') as f:
-            data = json.load(f)
-        return data
-
-    def write_json(self, data, filename):
-        # Write a JSON file to the BIDS directory
-        with open(self.bids_dir / filename, 'w') as f:
-            json.dump(data, f)
-
-    def rename_file(self, old_filename, new_filename):
-        # Rename a file in the BIDS directory
-        (self.bids_dir / old_filename).rename(self.bids_dir / new_filename)
-
-    def rename_dir(self, old_dirname, new_dirname):
-        # Rename a directory in the BIDS directory
-        (self.bids_dir / old_dirname).rename(self.bids_dir / new_dirname)
