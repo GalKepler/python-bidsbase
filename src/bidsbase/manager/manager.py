@@ -1,24 +1,23 @@
 from pathlib import Path
 import json
 from typing import Union
-import pybids
+from bids.layout.validation import validate_root
 
 
 class Manager:
-    def __init__(self, bids_dir: Union[str, Path]):
-        self.bids_dir = Path(bids_dir)
-        self.layout = pybids.BIDSLayout(str(self.bids_dir))
-
-    def validate(self) -> bool:
+    def __init__(self, root: Union[str, Path], validate: bool = True):
         """
-        Validate the BIDS directory
+        Initialize a BIDS Manager
 
-        Returns
-        -------
-        bool
-            True if the BIDS directory is valid, False otherwise
+        Parameters
+        ----------
+        root : Union[str, Path]
+            The root directory of the BIDS dataset
+        validate : bool, optional
+            Whether to validate the BIDS dataset, by default True
         """
-        return self.layout.validate()
+        self.root, self.description = validate_root(root, validate=validate)
+        self._copy_to = None
 
     def search(self, suffix: str) -> list:
         """
@@ -34,4 +33,15 @@ class Manager:
         list
             A list of paths to files with the specified suffix
         """
-        return list(self.bids_dir.glob(f'**/*{suffix}'))
+        return list(self.root.glob(f'**/*{suffix}'))
+
+    @property
+    def copy_to(self):
+        return self._copy_to
+
+    @copy_to.setter
+    def copy_to(self, value: Union[str, Path]):
+        if value is None:
+            self._copy_to = None
+        else:
+            self._copy_to = Path(value)
