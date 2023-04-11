@@ -8,6 +8,14 @@ class Session:
     """
 
     def __init__(self, path: Union[str, Path]):
+        """
+        Initialize a Session object
+
+        Parameters
+        ----------
+        path : Union[str, Path]
+            The path to the session directory
+        """
         self.path = Path(path)
 
     def __repr__(self) -> str:

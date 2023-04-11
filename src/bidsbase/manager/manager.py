@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 from typing import Union
 from bids.layout.validation import validate_root
+from bidsbase.manager.utils.logger import initiate_logger
 
 
 class Manager:
@@ -16,7 +17,19 @@ class Manager:
         validate : bool, optional
             Whether to validate the BIDS dataset, by default True
         """
-        self.root, self.description = validate_root(root, validate=validate)
+        self.logger = initiate_logger(Path(root).parent, name="BIDSBase")
+        self.logger.info(f"Initializing BIDS Manager for {root}")
+        self.logger.info(f"Validating BIDS dataset: {validate}")
+        try:
+            self.root, self.description = validate_root(
+                root, validate=validate
+            )
+            self.logger.info(
+                f"Successfully validated BIDS dataset: {self.description}"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to validate BIDS dataset: {e}")
+            raise e
         self._copy_to = None
 
     def search(self, suffix: str) -> list:
