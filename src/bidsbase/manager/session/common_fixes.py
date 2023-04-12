@@ -2,6 +2,14 @@ from pathlib import Path
 from typing import Union
 from bids.layout import parse_file_entities
 
+COMMON_FIXES = [
+    {
+        "name": "fix_multiple_dwi_runs",
+        "description": "Fix multiple DWI runs in a session directory",
+        "log": "Multiple DWI runs found in {session_path}:",
+    },
+]
+
 
 def fix_multiple_dwi_runs(
     session_path: Union[str, Path], auto_fix: bool = False
@@ -24,7 +32,7 @@ def fix_multiple_dwi_runs(
         ]
         # sort the runs by number of volumes
         dwi_runs = [x for _, x in sorted(zip(dwi_volumes, dwi_runs))]
-        if auto_fix:
+        if not auto_fix:
             # let the user choose which run to keep, based on the number of volumes
             print(
                 f"Multiple DWI runs found in {session_path}. Please choose which run to keep:"
