@@ -1,8 +1,9 @@
+import json
 import logging
 from pathlib import Path
 from typing import Union
+
 from bids.layout import parse_file_entities
-import json
 
 
 def update_fieldmap_json(
@@ -34,24 +35,14 @@ def update_fieldmap_json(
         if "IntendedFor" in fieldmap_json_dict:
             intended_for = fieldmap_json_dict["IntendedFor"]
             for key, val in files_mapping.items():
-                intended_for_key = str(
-                    Path(key).relative_to(session_path.parent)
-                )
+                intended_for_key = str(Path(key).relative_to(session_path.parent))
                 if intended_for_key in intended_for:
                     if val is not None:
-                        intended_for_val = str(
-                            Path(val).relative_to(session_path.parent)
-                        )
-                        logger.info(
-                            f"Updating {intended_for_key} to {intended_for_val}"
-                        )
-                        intended_for[
-                            intended_for.index(intended_for_key)
-                        ] = intended_for_val
+                        intended_for_val = str(Path(val).relative_to(session_path.parent))
+                        logger.info(f"Updating {intended_for_key} to {intended_for_val}")
+                        intended_for[intended_for.index(intended_for_key)] = intended_for_val
                     else:
-                        logger.info(
-                            f"Removing {intended_for_key} from {fieldmap_json}"
-                        )
+                        logger.info(f"Removing {intended_for_key} from {fieldmap_json}")
                         intended_for.remove(intended_for_key)
             fieldmap_json_dict["IntendedFor"] = intended_for
             with open(fieldmap_json, "w") as f:
@@ -85,31 +76,19 @@ def fix_multiple_dwi_runs(
     dwi_runs = list(session_path.glob("dwi/*run*_dwi.nii*"))
     n_runs = len(dwi_runs)
     if n_runs == 0:
-        logger.info(
-            f"No multiple DWI runs found in {session_path}. Skipping..."
-        )
+        logger.info(f"No multiple DWI runs found in {session_path}. Skipping...")
     if n_runs > 1:
         logger.warning(f"Multiple DWI runs found in {session_path}. Fixing...")
-        logger.info(
-            f"Configuration for fix_multiple_dwi_runs:\nauto_fix={auto_fix}"
-        )
+        logger.info(f"Configuration for fix_multiple_dwi_runs:\nauto_fix={auto_fix}")
         # locate the number of volumes in each run by looking at the corresponding .bval file
         dwi_volumes = [
-            len(
-                Path(dwi_run.parent / dwi_run.name.split(".")[0])
-                .with_suffix(".bval")
-                .read_text()
-                .split()
-            )
-            for dwi_run in dwi_runs
+            len(Path(dwi_run.parent / dwi_run.name.split(".")[0]).with_suffix(".bval").read_text().split()) for dwi_run in dwi_runs
         ]
         # sort the runs by number of volumes
         dwi_runs = [x for _, x in sorted(zip(dwi_volumes, dwi_runs))]
         if not auto_fix:
             # let the user choose which run to keep, based on the number of volumes
-            print(
-                f"Multiple DWI runs found in {session_path}. Please choose which run to keep:"
-            )
+            print(f"Multiple DWI runs found in {session_path}. Please choose which run to keep:")
             for i, dwi_run in enumerate(dwi_runs):
                 print(f"{i+1}: {dwi_run} ({dwi_volumes[i]} volumes)")
             choice = int(input("Enter the number of the run to keep: "))
@@ -120,12 +99,7 @@ def fix_multiple_dwi_runs(
         # add a message to logger describing the dwi runs, their number of volumes, and the chosen run
         fix_message = (
             f"Multiple DWI runs found in {session_path}:\n"
-            + "\n".join(
-                [
-                    f"{i+1}: {dwi_run} ({dwi_volumes[i]} volumes)"
-                    for i, dwi_run in enumerate(dwi_runs)
-                ]
-            )
+            + "\n".join([f"{i+1}: {dwi_run} ({dwi_volumes[i]} volumes)" for i, dwi_run in enumerate(dwi_runs)])
             + f"\nChosen run: {choice}"
         )
         logger.info(fix_message)
@@ -133,9 +107,7 @@ def fix_multiple_dwi_runs(
         logger.info(f"Renamed {files_mapping}")
         # remove the other runs
         for dwi_run in dwi_runs:
-            for associated_file in dwi_run.parent.glob(
-                f"{dwi_run.name.split('.')[0]}*"
-            ):
+            for associated_file in dwi_run.parent.glob(f"{dwi_run.name.split('.')[0]}*"):
                 logger.info(f"Removing {associated_file}")
                 associated_file.unlink()
                 files_mapping[associated_file] = None
@@ -158,9 +130,7 @@ def rename_dwi(dwi_file: Union[str, Path]) -> str:
     """
     dwi_file = Path(dwi_file)
     files_mapping = {}
-    for associated_file in dwi_file.parent.glob(
-        f"{dwi_file.name.split('.')[0]}*"
-    ):
+    for associated_file in dwi_file.parent.glob(f"{dwi_file.name.split('.')[0]}*"):
         run = parse_file_entities(str(associated_file)).get("run")
         new_name = associated_file.name.replace(f"_run-{run}", "")
         associated_file.rename(associated_file.parent / new_name)
