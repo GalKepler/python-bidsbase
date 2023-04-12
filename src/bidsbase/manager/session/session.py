@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 from typing import Union
+
 from bidsbase.manager.session import COMMON_FIXES
 from bidsbase.manager.utils.logger import initiate_logger
 
@@ -26,13 +27,7 @@ class Session:
         """
         self.path = Path(path)
         self.auto_fix = auto_fix
-        self.logger = (
-            logger
-            if logger is not None
-            else initiate_logger(
-                self.path.parent.parent.parent, name="Session"
-            )
-        )
+        self.logger = logger if logger is not None else initiate_logger(self.path.parent.parent.parent, name="Session")
         self.logger.info(f"Initializing Session object for {self.path}")
 
     def __repr__(self) -> str:
