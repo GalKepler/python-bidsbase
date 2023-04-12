@@ -3,6 +3,7 @@ import json
 import shutil
 from typing import Union
 from bids.layout.validation import validate_root
+from bidsbase.manager.session.session import Session
 from bidsbase.manager.utils.logger import initiate_logger
 
 
@@ -12,6 +13,8 @@ class Manager:
         root: Union[str, Path],
         validate: bool = True,
         copy_to: Union[str, Path] = None,
+        force_copy: bool = False,
+        auto_fix: bool = True,
     ):
         """
         Initialize a BIDS Manager
@@ -43,6 +46,8 @@ class Manager:
             if copy_to is None
             else Path(copy_to)
         )
+        self.auto_fix = auto_fix
+        self.create_copy(force=force_copy)
 
     def search(self, suffix: str) -> list:
         """
@@ -60,22 +65,63 @@ class Manager:
         """
         return list(self.root.glob(f'**/*{suffix}'))
 
-    def create_copy(self):
+    def create_copy(self, force=False):
         """
         Create a copy of the BIDS dataset in a new directory
         """
-        self.logger.info(f"Creating copy of BIDS dataset in {self.copy_to}")
-        try:
-            self.copy_to.mkdir(parents=True, exist_ok=True)
-            for file in self.root.glob("**/*"):
-                new_path = self.copy_to / file.relative_to(self.root)
-                if file.is_file() and not new_path.exists():
-                    new_path.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy(file, new_path)
-            self.logger.info(f"Successfully created copy of BIDS dataset")
-        except Exception as e:
-            self.logger.error(f"Failed to create copy of BIDS dataset: {e}")
-            raise e
+        self.logger.info(f"Creating copy of BIDS dataset")
+        if self.copy_to.exists() and not force:
+            self.logger.info(
+                f"Copy of BIDS dataset already exists: {self.copy_to}"
+            )
+            return
+        elif self.copy_to.exists() and force:
+            self.logger.info(f"Removing existing copy of BIDS dataset")
+            shutil.rmtree(self.copy_to)
+        self.logger.info(f"Copying BIDS dataset to {self.copy_to}")
+        shutil.copytree(self.root, self.copy_to)
+        self.logger.info(f"Successfully copied BIDS dataset to {self.copy_to}")
+
+    def fix_dataset(self):
+        """
+        Fix the BIDS dataset according to known issues
+        """
+        self.logger.info(f"Fixing BIDS dataset")
+        for subject in self.subjects:
+            for session_id, session in self.sessions[subject].items():
+                session.fix_session()
+
+    @property
+    def subjects(self) -> list:
+        """
+        Get a list of subjects in the BIDS dataset
+
+        Returns
+        -------
+        list
+            A list of subjects
+        """
+        return [i.name.split("-")[-1] for i in self.copy_to.glob("sub-*")]
+
+    @property
+    def sessions(self) -> dict:
+        """
+        Get a dictionary of sessions for each subject in the BIDS dataset
+
+        Returns
+        -------
+        dict
+            A dictionary of sessions for each subject
+        """
+        return {
+            subject: {
+                i.name.split("-")[-1]: Session(
+                    path=i, auto_fix=self.auto_fix, logger=self.logger
+                )
+                for i in self.copy_to.glob(f"sub-{subject}/ses-*")
+            }
+            for subject in self.subjects
+        }
 
     @property
     def copy_to(self):

@@ -1,5 +1,8 @@
+import logging
 from pathlib import Path
 from typing import Union
+from bidsbase.manager.session import COMMON_FIXES
+from bidsbase.manager.utils.logger import initiate_logger
 
 
 class Session:
@@ -7,7 +10,12 @@ class Session:
     Session class for BIDSBase
     """
 
-    def __init__(self, path: Union[str, Path]):
+    def __init__(
+        self,
+        path: Union[str, Path],
+        auto_fix: bool = True,
+        logger: logging.Logger = None,
+    ):
         """
         Initialize a Session object
 
@@ -17,6 +25,15 @@ class Session:
             The path to the session directory
         """
         self.path = Path(path)
+        self.auto_fix = auto_fix
+        self.logger = (
+            logger
+            if logger is not None
+            else initiate_logger(
+                self.path.parent.parent.parent, name="Session"
+            )
+        )
+        self.logger.info(f"Initializing Session object for {self.path}")
 
     def __repr__(self) -> str:
         """
@@ -40,12 +57,23 @@ class Session:
         """
         return self.name
 
-    def fix(self):
+    def fix(self, fixes: list = COMMON_FIXES):
         """
         Fix the session directory
+
+        Parameters
+        ----------
+        fixes : list, optional
+            The list of fixes to apply, by default COMMON_FIXES
         """
-        # TODO: Implement this
-        pass
+        self.logger.info(f"Fixing session {self.name}")
+        for fix in fixes:
+            self.logger.info(f"Applying fix {fix.__name__}")
+            fix(
+                logger=self.logger,
+                session_path=self.path,
+                auto_fix=self.auto_fix,
+            )
 
     @property
     def name(self):
