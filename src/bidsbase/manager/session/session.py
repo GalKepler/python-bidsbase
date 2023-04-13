@@ -29,6 +29,7 @@ class Session:
         self.auto_fix = auto_fix
         self.logger = logger if logger is not None else initiate_logger(self.path.parent.parent.parent, name="Session")
         self.logger.info(f"Initializing Session object for {self.path}")
+        self.fixed = False
 
     def __repr__(self) -> str:
         """
@@ -62,13 +63,21 @@ class Session:
             The list of fixes to apply, by default COMMON_FIXES
         """
         self.logger.info(f"Fixing session {self.name}")
+        files_changed = {}
         for fix in fixes:
             self.logger.info(f"Applying fix {fix.__name__}")
-            fix(
+            fixed, fix_changed = fix(
                 logger=self.logger,
                 session_path=self.path,
                 auto_fix=self.auto_fix,
             )
+            if fixed:
+                self.fixed = True
+                self.logger.info(f"Successfully applied fix {fix.__name__}")
+                files_changed.update(fix_changed)
+        # change files changed keys and values to be strings
+        files_changed = {str(k): str(v) if v is not None else "deleted" for k, v in files_changed.items()}
+        return files_changed
 
     @property
     def name(self):

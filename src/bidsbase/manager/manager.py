@@ -5,11 +5,14 @@ from typing import Union
 
 from bids.layout.validation import validate_root
 
+from bidsbase.manager.session import COMMON_FIXES
 from bidsbase.manager.session.session import Session
 from bidsbase.manager.utils.logger import initiate_logger
 
 
 class Manager:
+    FIXES = COMMON_FIXES.copy()
+
     def __init__(
         self,
         root: Union[str, Path],
@@ -17,6 +20,7 @@ class Manager:
         copy_to: Union[str, Path] = None,
         force_copy: bool = False,
         auto_fix: bool = True,
+        work_dir: Union[str, Path] = None,
     ):
         """
         Initialize a BIDS Manager
@@ -28,6 +32,8 @@ class Manager:
         validate : bool, optional
             Whether to validate the BIDS dataset, by default True
         """
+        self.work_dir = Path(work_dir) if work_dir is not None else Path(root).parent / "BIDSBase"
+        self.work_dir.mkdir(parents=True, exist_ok=True)
         self.logger = initiate_logger(Path(root).parent, name="BIDSBase")
         self.logger.info(f"Initializing BIDS Manager for {root}")
         self.logger.info(f"Validating BIDS dataset: {validate}")
@@ -78,8 +84,19 @@ class Manager:
         """
         self.logger.info("Fixing BIDS dataset")
         for subject in self.subjects:
-            for session_id, session in self.sessions[subject].items():
-                session.fix_session()
+            for session in self.sessions[subject].values():
+                changed_files = session.fix(fixes=self.FIXES)
+                if session.fixed:
+                    session_work_dir = self.work_dir / session.path.relative_to(self.copy_to)
+                    session_work_dir.mkdir(parents=True, exist_ok=True)
+                    self.logger.info(
+                        f"Fixed BIDS dataset for subject {subject}, "
+                        f"session {session}.\n"
+                        "Summary of changed files can be located at "
+                        f"{session_work_dir / 'fixes.json'}",
+                    )
+                    with open(session_work_dir / "fixes.json", "w") as f:
+                        json.dump(changed_files, f, indent=4)
 
     @property
     def subjects(self) -> list:

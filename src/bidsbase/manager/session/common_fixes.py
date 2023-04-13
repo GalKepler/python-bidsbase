@@ -54,7 +54,7 @@ def fix_multiple_dwi_runs(
     logger: logging.Logger,
     session_path: Union[str, Path],
     auto_fix: bool = True,
-) -> None:
+) -> bool:
     """
     Fix multiple DWI runs in a session directory
 
@@ -69,8 +69,11 @@ def fix_multiple_dwi_runs(
 
     Returns
     -------
-    None
+    bool
+        Whether the session directory was fixed
     """
+    fixed = False
+    files_mapping = {}
     logger.info(f"Searching for multiple DWI runs in {session_path}")
     session_path = Path(session_path)
     dwi_runs = list(session_path.glob("dwi/*run*_dwi.nii*"))
@@ -112,6 +115,8 @@ def fix_multiple_dwi_runs(
                 associated_file.unlink()
                 files_mapping[associated_file] = None
         update_fieldmap_json(files_mapping, logger, session_path)
+        fixed = True
+    return fixed, files_mapping
 
 
 def rename_dwi(dwi_file: Union[str, Path]) -> str:
