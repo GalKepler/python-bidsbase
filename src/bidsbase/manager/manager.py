@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Union
@@ -75,7 +76,8 @@ class Manager:
             self.logger.info("Removing existing copy of BIDS dataset")
             shutil.rmtree(self.copy_to)
         self.logger.info(f"Copying BIDS dataset to {self.copy_to}")
-        shutil.copytree(self.root, self.copy_to)
+        # shutil.copytree(self.root, self.copy_to)
+        os.system(f"rsync -azPL {self.root} {self.copy_to}")
         self.logger.info(f"Successfully copied BIDS dataset to {self.copy_to}")
 
     def fix_dataset(self):
