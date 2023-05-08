@@ -69,16 +69,23 @@ class Manager:
         Create a copy of the BIDS dataset in a new directory
         """
         self.logger.info("Creating copy of BIDS dataset")
-        if self.copy_to.exists() and not force:
-            self.logger.info(f"Copy of BIDS dataset already exists: {self.copy_to}")
-            return
-        elif self.copy_to.exists() and force:
-            self.logger.info("Removing existing copy of BIDS dataset")
-            shutil.rmtree(self.copy_to)
-        self.logger.info(f"Copying BIDS dataset to {self.copy_to}")
-        # shutil.copytree(self.root, self.copy_to)
-        os.system(f"rsync -azPL {self.root} {self.copy_to}")
-        self.logger.info(f"Successfully copied BIDS dataset to {self.copy_to}")
+        for subject in self.subjects:
+            for session in self.root.glob(f"sub-{subject}/ses-*"):
+                new_path = Path(self.copy_to / session.relative_to(self.root))
+                if new_path.exists() and not force:
+                    self.logger.info(f"Copy of session {session} already exists: {new_path}")
+                    continue
+                elif new_path.exists() and force:
+                    self.logger.info(f"Removing existing copy of session {session}")
+                    shutil.rmtree(new_path)
+                self.logger.info(f"Copying session {session} to {new_path}")
+                new_path.mkdir(parents=True, exist_ok=True)
+                os.system(f"rsync -azPL {session}/* {new_path}")
+                self.logger.info(f"Successfully copied session {session} to {new_path}")
+        for additional_file in self.root.glob("*"):
+            if not additional_file.name.startswith("sub-*"):
+                os.system(f"rsync -azPL {additional_file} {self.copy_to}")
+        self.logger.info("Successfully created copy of BIDS dataset")
 
     def fix_dataset(self):
         """
@@ -110,7 +117,7 @@ class Manager:
         list
             A list of subjects
         """
-        return [i.name.split("-")[-1] for i in self.copy_to.glob("sub-*")]
+        return [i.name.split("-")[-1] for i in self.root.glob("sub-*")]
 
     @property
     def sessions(self) -> dict:
