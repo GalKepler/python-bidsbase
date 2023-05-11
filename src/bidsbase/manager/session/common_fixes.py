@@ -87,8 +87,8 @@ def fix_multiple_dwi_runs(
         dwi_volumes = [
             len(Path(dwi_run.parent / dwi_run.name.split(".")[0]).with_suffix(".bval").read_text().split()) for dwi_run in dwi_runs
         ]
-        # sort the runs by number of volumes
-        dwi_runs = [x for _, x in sorted(zip(dwi_volumes, dwi_runs))]
+        # sort the volumns and runs by number of volumes
+        dwi_runs, dwi_volumes = zip(*sorted(zip(dwi_runs, dwi_volumes), key=lambda x: x[1]))
         if not auto_fix:
             # let the user choose which run to keep, based on the number of volumes
             print(f"Multiple DWI runs found in {session_path}. Please choose which run to keep:")
