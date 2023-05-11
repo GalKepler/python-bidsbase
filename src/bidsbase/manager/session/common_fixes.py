@@ -1,5 +1,6 @@
 import json
 import logging
+import subprocess
 from pathlib import Path
 from typing import Union
 
@@ -141,3 +142,156 @@ def rename_dwi(dwi_file: Union[str, Path]) -> str:
         associated_file.rename(associated_file.parent / new_name)
         files_mapping[associated_file] = associated_file.parent / new_name
     return files_mapping
+
+
+def generate_fieldmap_from_dwi(
+    logger: logging.Logger,
+    session_path: Union[str, Path],
+    auto_fix: bool = True,
+):
+    """
+    Generate a fieldmap from a DWI file
+
+    Parameters
+    ----------
+    logger : logging.Logger
+        The logger
+    session_path : Union[str, Path]
+        The path to the session directory
+    auto_fix : bool, optional
+        Whether to automatically fix the issue, by default False
+
+    Returns
+    -------
+    bool
+        Whether the session directory was fixed
+    """
+    fixed = False
+    files_mapping = {}
+    logger.info(f"Searching for reversed-phased DWIs in {session_path}")
+    session_path = Path(session_path)
+    forwared_phased_dwis = list(session_path.glob("dwi/*dir-FWD*_dwi.nii*"))
+    reversed_phased_dwis = list(session_path.glob("dwi/*dir-REV*_dwi.nii*"))
+    n_reversed_phased_dwis = len(reversed_phased_dwis)
+    if n_reversed_phased_dwis == 0:
+        logger.info(f"No reversed-phased DWIs found in {session_path}. Skipping...")
+    else:
+        reversed_phased_dwi = reversed_phased_dwis[0]
+        logger.info(f"Found reversed-phased DWI: {reversed_phased_dwi}")
+        bvec, bval, json_file = get_bvec_bval_json(reversed_phased_dwi)
+        base_entities = parse_file_entities(str(reversed_phased_dwi))
+        base_entities.update({"suffix": "epi", "datatype": "fmap", "acquisition": "dwi"})
+        new_base_name = generate_fieldmap_name(base_entities)
+        out_nifti = session_path / f"{new_base_name}.nii.gz"
+        new_json_file = session_path / f"{new_base_name}.json"
+        if out_nifti.exists() and new_json_file.exists():
+            logger.info(f"Fieldmap already exists in {session_path}. Skipping...")
+        else:
+            extract_b0(reversed_phased_dwi, bvec, bval, out_nifti, logger=logger)
+            files_mapping[reversed_phased_dwi] = out_nifti
+            logger.info(f"Extracted b0 from {reversed_phased_dwi} to {out_nifti}")
+            # copy the json file and edit it to match the new file
+            copy_and_edit_fieldmap_json(
+                json_file,
+                new_json_file,
+                forwared_phased_dwis,
+                session_path.parent,
+            )
+            files_mapping[json_file] = new_json_file
+            logger.info(f"Copied {json_file} to {new_json_file}")
+            # remove dwis from acq-rest fieldmaps
+            for fmap in session_path.glob("fmap/*_acq-rest_*.json"):
+                logger.info(f"Removing forward phased dwi from {fmap}")
+                with open(fmap, "r") as f:
+                    json_data = json.load(f)
+                intended_for = json_data["IntendedFor"]
+                json_data["IntendedFor"] = [i for i in intended_for if parse_file_entities(i)["datatype"] != "dwi"]
+                with open(fmap, "w") as f:
+                    json.dump(json_data, f, indent=4)
+
+            fixed = True
+    return fixed, files_mapping
+
+
+def copy_and_edit_fieldmap_json(
+    json_file: Union[str, Path],
+    new_json_file: Union[str, Path],
+    intended_for: list[Path],
+    relative_to: Path,
+):
+    """
+    Copy a fieldmap json file and edit it to match the new file
+
+    Parameters
+    ----------
+    json_file : Union[str, Path]
+        The path to the original json file
+    new_json_file : Union[str, Path]
+        The path to the new json file
+    intended_for : list[Path]
+        The list of files the new json file is intended for
+    relative_to : Path
+        The path to the directory the new json file is relative to
+    """
+    with open(json_file, "r") as f:
+        json_data = json.load(f)
+    json_data["IntendedFor"] = [str(file.relative_to(relative_to)) for file in intended_for]
+    with open(new_json_file, "w") as f:
+        json.dump(json_data, f, indent=4)
+
+
+def extract_b0(in_file: str, bvec: str, bval: str, out_file: str, logger: logging.Logger):
+    """
+    Extract the b0 volumes from a dwi file
+
+    Parameters
+    ----------
+    in_file : str
+        The dwi file
+    bvec : str
+        The bvec file
+    bval : str
+        The bval file
+    out_file : str
+        The output file
+    """
+    cmd = f"dwiextract {in_file} -bzero -fslgrad {bvec} {bval} {out_file}"
+    logger.info(f"Running: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+
+
+def generate_fieldmap_name(entities: dict) -> str:
+    """
+    Based on the entities, generate a name for the fieldmap
+
+    Parameters
+    ----------
+    entities : dict
+        The entities
+
+    Returns
+    -------
+    str
+        The name of the fieldmap
+    """
+    return f"{entities['datatype']}/sub-{entities['subject']}_ses-{entities['session']}_acq-{entities['acquisition']}_dir-{entities['direction']}_{entities['suffix']}"  # noqa
+
+
+def get_bvec_bval_json(in_file: Path):
+    """
+    Gets the corresponding bvec, bval and json files for a given dwi file
+
+    Parameters
+    ----------
+    in_file : Path
+        The dwi file
+
+    Returns
+    -------
+    Tuple(Path,Path,Path)
+        The bvec, bval and json files
+    """
+    bvec = in_file.parent / ".".join([in_file.name.split(".")[0], "bvec"])
+    bval = in_file.parent / ".".join([in_file.name.split(".")[0], "bval"])
+    json_file = in_file.parent / ".".join([in_file.name.split(".")[0], "json"])
+    return bvec, bval, json_file
