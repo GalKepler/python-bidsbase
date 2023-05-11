@@ -255,7 +255,7 @@ def extract_b0(in_file: str, bvec: str, bval: str, out_file: str, logger: loggin
     out_file : str
         The output file
     """
-    cmd = f"dwiextract {in_file} -bzero -fslgrad {bvec} {bval} {out_file}"
+    cmd = f"dwiextract {in_file} -bzero -fslgrad {bvec} {bval} - | mrmath - mean {out_file} -axis 3 -force"
     logger.info(f"Running: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
 
