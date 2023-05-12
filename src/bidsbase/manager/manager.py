@@ -22,6 +22,7 @@ class Manager:
         force_copy: bool = False,
         auto_fix: bool = True,
         work_dir: Union[str, Path] = None,
+        stop_on_first_crash: bool = False,
     ):
         """
         Initialize a BIDS Manager
@@ -35,6 +36,7 @@ class Manager:
         """
         self.work_dir = Path(work_dir) if work_dir is not None else Path(root).parent / "BIDSBase"
         self.work_dir.mkdir(parents=True, exist_ok=True)
+        self.stop_on_first_crash = stop_on_first_crash
         self.logger = initiate_logger(Path(root).parent, name="BIDSBase")
         self.logger.info(f"Initializing BIDS Manager for {root}")
         self.logger.info(f"Validating BIDS dataset: {validate}")
@@ -94,7 +96,13 @@ class Manager:
         self.logger.info("Fixing BIDS dataset")
         for subject in self.subjects:
             for session in self.sessions[subject].values():
-                changed_files = session.fix(fixes=self.FIXES)
+                try:
+                    changed_files = session.fix(fixes=self.FIXES)
+                except Exception as e:
+                    self.logger.error(f"Failed to fix BIDS dataset for subject {subject}, " f"session {session}: {e}")
+                    if self.stop_on_first_crash:
+                        raise e
+                    continue
                 if session.fixed:
                     session_work_dir = self.work_dir / session.path.relative_to(self.copy_to)
                     session_work_dir.mkdir(parents=True, exist_ok=True)
