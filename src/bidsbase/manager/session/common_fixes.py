@@ -187,6 +187,7 @@ def generate_fieldmap_from_dwi(
         if out_nifti.exists() and new_json_file.exists():
             logger.info(f"Fieldmap already exists in {session_path}. Skipping...")
         else:
+            out_nifti.parent.mkdir(exist_ok=True, parents=True)
             extract_b0(reversed_phased_dwi, bvec, bval, out_nifti, logger=logger)
             files_mapping[reversed_phased_dwi] = out_nifti
             logger.info(f"Extracted b0 from {reversed_phased_dwi} to {out_nifti}")
